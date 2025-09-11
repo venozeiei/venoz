@@ -1,14 +1,14 @@
-_G.WebhookLink = "LINK HERE"
+_G.WebhookLink = "https://discord.com/api/webhooks/1411013410908278885/CPUQ6HLap1eAAzQROPKFnZ-4cCAfK1P3JLI4QfnNhcnhvk1aPIU3HHujDD2gcDMZNjZZ"
 _G.OPFarmGem = true
 
 _G.Class = {
-    Enabled = false,
+    Enabled = true,
     Target = "Gambler" -- Class Name
 }
 
 _G.LockDiamond = {
     Enabled = false,
-    Amount = 1000, -- 1000,2000,3000
+    Amount = 1000,
     SendWebhook = {
         Enabled = false,
         WebhookLink = "",
