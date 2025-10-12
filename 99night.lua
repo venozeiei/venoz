@@ -42,7 +42,7 @@ repeat task.wait() until game.Players.LocalPlayer:FindFirstChild("PlayerGui")
         ['Race'] = {
             ['EnabledEvo'] = true,
             ["v2"] = false,
-            ["v3"] = true,
+            ["v3"] = false,
             ["Races_Lock"] = {
                 ["Races"] = { -- Select Races U want
                     ["Mink"] = true,
@@ -103,3 +103,4 @@ repeat task.wait() until game.Players.LocalPlayer:FindFirstChild("PlayerGui")
     getgenv().id = "1015231612272787497"
     getgenv().Script_Mode = "Kaitun_Script"
     loadstring(game:HttpGet("https://raw.githubusercontent.com/xshiba/MaruBitkub/main/Mobile.lua"))()
+
