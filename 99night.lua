@@ -1,50 +1,30 @@
--- ASTD:X Horst Logger (Full)
+repeat task.wait() until game:IsLoaded()
 
-spawn(function()
-    while true do
-        local plr = game:GetService("Players").LocalPlayer
-        local msg = "Loading..."
+local Players = game:GetService("Players")
+local RS = game:GetService("ReplicatedStorage")
+local Plr = Players.LocalPlayer.Name
 
-        pcall(function()
-            local hud = plr.PlayerGui:WaitForChild("HUD")
-            local bottom = hud:WaitForChild("BottomFrame")
-            local currency = bottom:WaitForChild("CurrencyList")
+local LV = workspace.Camera:WaitForChild(Plr).Head.NameLevelBBGUI.LevelFrame.TextLabel.Text
+local level = tonumber(string.match(LV,"%d+"))
 
-            local cash = "0"
-            local gems = "0"
-            local stardust = "0"
-            local coins = "0"
+local Gems = Players.LocalPlayer.Backpack.Framework.TasksV2.TaskCard.TaskCardTemplate.ClaimButton.GemsAmount.Text
+local stardust = Players.LocalPlayer.PlayerGui.HUD.BottomFrame.CurrencyList.Stardust.Amount.Text
+local Gold = Players.LocalPlayer.PlayerGui.HUD.BottomFrame.CurrencyList.Coins.Amount.Text
 
-            if currency:FindFirstChild("Cash") then
-                cash = currency.Cash.Text
-            end
+while true do
+    local mapName = RS.Map.Value
+    local challengeMap = RS.ChallengeMap.Value
+    local wave = Players.LocalPlayer.PlayerGui.HUD.Wave.Text
 
-            if currency:FindFirstChild("Gem") and currency.Gem:FindFirstChild("Amount") then
-                gems = currency.Gem.Amount.Text
-            end
+    local message =
+    "⚡Lv." .. level ..
+    " | 🪙" .. Gold ..
+    " | 💎" .. Gems ..
+    " | ⭐" .. stardust ..
+    " | 🗺️" .. mapName ..
+    " | 🌊" .. wave ..
+    (challengeMap ~= "" and " | ⚔️" .. challengeMap or "")
 
-            if currency:FindFirstChild("Stardust") and currency.Stardust:FindFirstChild("Amount") then
-                stardust = currency.Stardust.Amount.Text
-            end
-
-            if currency:FindFirstChild("Coins") and currency.Coins:FindFirstChild("Amount") then
-                coins = currency.Coins.Amount.Text
-            end
-
-            msg =
-                "👤 "..plr.Name..
-                " | 💰 "..cash..
-                " | 💎 "..gems..
-                " | ⭐ "..stardust..
-                " | 🪙 "..coins
-        end)
-
-        if _G.Horst_SetDescription then
-            _G.Horst_SetDescription(msg)
-        end
-
-        print(msg)
-
-        task.wait(3)
-    end
-end)
+    _G.Horst_SetDescription(message)
+    task.wait(3)
+end
