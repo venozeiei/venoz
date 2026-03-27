@@ -17,13 +17,13 @@ while true do
     local wave = Players.LocalPlayer.PlayerGui.HUD.Wave.Text
 
     local message =
-    "⚡Lv." .. level ..
-    " | 🪙" .. Gold ..
-    " | 💎" .. Gems ..
-    " | ⭐" .. stardust ..
-    " | 🗺️" .. mapName ..
-    " | 🌊" .. wave ..
-    (challengeMap ~= "" and " | ⚔️" .. challengeMap or "")
+    "Level :" .. level ..
+    " Gold :" .. Gold ..
+    " Gems :" .. Gems ..
+    " ⭐stardust :" .. stardust ..
+    " 🗺️Map :" .. mapName ..
+    " 🌊" .. wave ..
+    (challengeMap ~= "" and " ⚔️Challenge :" .. challengeMap or "")
 
     _G.Horst_SetDescription(message)
     task.wait(3)
