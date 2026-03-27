@@ -1,73 +1,50 @@
-repeat task.wait() until game:IsLoaded()
-
-local Players = game:GetService("Players")
-local plr = Players.LocalPlayer
-
-local function safe(f)
-    local ok,v = pcall(f)
-    if ok and v then
-        return tostring(v)
-    end
-    return "0"
-end
-
-local function getLevel()
-    return safe(function()
-        local txt = workspace.Camera:WaitForChild(plr.Name)
-        .Head.NameLevelBBGUI.LevelFrame.TextLabel.Text
-        return txt:match("%d+")
-    end)
-end
-
-local function getGold()
-    return safe(function()
-        return plr.PlayerGui.HUD.BottomFrame.CurrencyList.Coins.Amount.Text
-    end)
-end
-
-local function getGems()
-    return safe(function()
-        return plr.PlayerGui.HUD.BottomFrame.CurrencyList.Gems.Amount.Text
-    end)
-end
-
-local function getStardust()
-    return safe(function()
-        return plr.PlayerGui.HUD.BottomFrame.CurrencyList.Stardust.Amount.Text
-    end)
-end
-
-local function getWave()
-    return safe(function()
-        return plr.PlayerGui.HUD.TopFrame.WaveFrame.Wave.Text
-    end)
-end
-
-local function getMap()
-    return safe(function()
-        if workspace:FindFirstChild("Map") then
-            return workspace.Map.Name
-        end
-        return "Lobby"
-    end)
-end
+-- ASTD:X Horst Logger (Full)
 
 spawn(function()
-while true do
+    while true do
+        local plr = game:GetService("Players").LocalPlayer
+        local msg = "Loading..."
 
-local msg =
-"⭐Level:"..getLevel()..
-" 💰Gold:"..getGold()..
-" 💎Gems:"..getGems()..
-" ⭐stardust:"..getStardust()..
-" 🗺Map:"..getMap()..
-" 🌊Wave:"..getWave()
+        pcall(function()
+            local hud = plr.PlayerGui:WaitForChild("HUD")
+            local bottom = hud:WaitForChild("BottomFrame")
+            local currency = bottom:WaitForChild("CurrencyList")
 
-if _G.Horst_SetDescription then
-    _G.Horst_SetDescription(msg)
-end
+            local cash = "0"
+            local gems = "0"
+            local stardust = "0"
+            local coins = "0"
 
-task.wait(3)
+            if currency:FindFirstChild("Cash") then
+                cash = currency.Cash.Text
+            end
 
-end
+            if currency:FindFirstChild("Gem") and currency.Gem:FindFirstChild("Amount") then
+                gems = currency.Gem.Amount.Text
+            end
+
+            if currency:FindFirstChild("Stardust") and currency.Stardust:FindFirstChild("Amount") then
+                stardust = currency.Stardust.Amount.Text
+            end
+
+            if currency:FindFirstChild("Coins") and currency.Coins:FindFirstChild("Amount") then
+                coins = currency.Coins.Amount.Text
+            end
+
+            msg =
+                "👤 "..plr.Name..
+                " | 💰 "..cash..
+                " | 💎 "..gems..
+                " | ⭐ "..stardust..
+                " | 🪙 "..coins
+        end)
+
+        if _G.Horst_SetDescription then
+            _G.Horst_SetDescription(msg)
+        end
+
+        print(msg)
+
+        task.wait(3)
+    end
 end)
