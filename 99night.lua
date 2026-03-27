@@ -1,26 +1,25 @@
 repeat task.wait() until game:IsLoaded()
 
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
-
 local plr = Players.LocalPlayer
 
--- ฟังก์ชันอ่านค่าปลอดภัย
-local function safe(get)
-    local ok,v = pcall(get)
-    if ok and v then
-        return v
+-- รอ HUD โหลด
+repeat task.wait() until plr:FindFirstChild("PlayerGui")
+
+local function safe(func)
+    local ok,res = pcall(func)
+    if ok and res then
+        return tostring(res)
     end
-    return "N/A"
+    return "0"
 end
 
 -- LEVEL
 local function getLevel()
     return safe(function()
-        local LV = Workspace.Camera:WaitForChild(plr.Name)
+        local txt = workspace.Camera:WaitForChild(plr.Name)
         .Head.NameLevelBBGUI.LevelFrame.TextLabel.Text
-        return tonumber(string.match(LV,"%d+"))
+        return txt:match("%d+")
     end)
 end
 
@@ -34,7 +33,7 @@ end
 -- GEMS
 local function getGems()
     return safe(function()
-        return plr.Backpack.Framework.TasksV2.TaskCard.TaskCardTemplate.ClaimButton.GemsAmount.Text
+        return plr.PlayerGui.HUD.BottomFrame.CurrencyList.Gems.Amount.Text
     end)
 end
 
@@ -55,16 +54,18 @@ end
 -- MAP
 local function getMap()
     return safe(function()
-        return game:GetService("Workspace").Map.Name
+        if workspace:FindFirstChild("Map") then
+            return workspace.Map.Name
+        end
+        return "Lobby"
     end)
 end
 
 -- MODE
 local function getMode()
     return safe(function()
-        local mode = ReplicatedStorage:FindFirstChild("GameMode")
-        if mode then
-            return mode.Value
+        if game.ReplicatedStorage:FindFirstChild("GameMode") then
+            return game.ReplicatedStorage.GameMode.Value
         end
         return "Lobby"
     end)
@@ -73,42 +74,45 @@ end
 -- CHAPTER
 local function getChapter()
     return safe(function()
-        local chapter = ReplicatedStorage:FindFirstChild("Chapter")
-        if chapter then
-            return chapter.Value
+        if game.ReplicatedStorage:FindFirstChild("Chapter") then
+            return game.ReplicatedStorage.Chapter.Value
         end
         return "None"
     end)
 end
 
--- สถานะ
+-- STATUS
 local function getStatus()
-    if Workspace:FindFirstChild("Enemies") then
-        return "In Game"
+    if workspace:FindFirstChild("Enemies") then
+        return "FARMING"
     else
-        return "Lobby"
+        return "LOBBY"
     end
 end
 
 -- LOOP LOGGER
+spawn(function()
 while true do
-    local msg =
-    "👤 Player : "..plr.Name..
-    "\n⭐ Level : "..getLevel()..
-    "\n💰 Gold : "..getGold()..
-    "\n💎 Gems : "..getGems()..
-    "\n✨ Stardust : "..getStardust()..
-    "\n🧭 Map : "..getMap()..
-    "\n🎮 Mode : "..getMode()..
-    "\n📖 Chapter : "..getChapter()..
-    "\n🌊 Wave : "..getWave()..
-    "\n🟢 Status : "..getStatus()
 
-    if _G.Horst_SetDescription then
-        _G.Horst_SetDescription(msg)
-    end
+local msg =
+"👤 Player : "..plr.Name..
+"\n🗺 Map : "..getMap()..
+"\n🎮 Mode : "..getMode()..
+"\n📖 Chapter : "..getChapter()..
+"\n🌊 Wave : "..getWave()..
+"\n\n⭐ Level : "..getLevel()..
+"\n💰 Gold : "..getGold()..
+"\n💎 Gems : "..getGems()..
+"\n✨ Stardust : "..getStardust()..
+"\n\n🟢 Status : "..getStatus()
 
-    print(msg)
-
-    task.wait(3)
+if _G.Horst_SetDescription then
+    _G.Horst_SetDescription(msg)
 end
+
+print(msg)
+
+task.wait(3)
+
+end
+end)
