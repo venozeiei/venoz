@@ -18,18 +18,18 @@
 --  ถ้าไม่เห็น 4 บรรทัดนี้ใน F9 = ยังรันโค้ดตัวเก่าอยู่ ให้ paste ไฟล์ใหม่ทับ
 -- ═══════════════════════════════════════════════════════════════
 print("═══════════════════════════════════════════════")
-print("🛡️ VENOZ NO-SB — BUILD v6.0")
+print("🛡️ VENOZ NO-SB — BUILD v6.2")
 print("   🔁 RETRY กดครั้งเดียว (รอนิ่ง 3 วิก่อนกด)")
 print("   ⚡ เข้าด่าน = ฟาร์มทันที ไม่รอโหลดอะไรทั้งนั้น")
 print("   ⬛ จอว่างทุกที่ (Main Menu + Lobby + ในด่าน) + ปิดแชทถาวร")
 print("   ⏳ แก้ค้างจอ LOADING ตอนกดออกจากด่าน")
-print("   ⚡ ใส่ระบบ Thunder Spear questline กลับมาแล้ว (Utgard + Forest)")
+print("   ⚡ TS: จุติเท่าที่ตั้ง=รอตัน | จุติเกินที่ตั้ง=ทำหอกทันที")
 print("   🔍 เช็คให้เลยว่าคอนฟิกส่งถึงสคริปจริงไหม (ดูบรรทัด [CONFIG])")
 print("   🛡️ ใช้ remote ทั้งหมดเหมือนเดิม แต่ทุกจุดมีด่านเช็คก่อนยิง")
 print("   🔇 ปิดเคลมเควส/achievement/สกิล เป็นค่าเริ่มต้น (ตัดไป 281 call)")
 print("   🗑️ ตัดโค้ดไม่ใช้ทิ้ง 2,749 บรรทัด")
 print("═══════════════════════════════════════════════")
-getgenv().VenozBuild = "v6.0-nosb"
+getgenv().VenozBuild = "v6.2-nosb"
 
 -- ระบบเช็คสถานะ GUI และ Auto Teleport เมื่อผิดปกติ
 task.spawn(function()
@@ -254,6 +254,7 @@ getgenv().VenozPressing    = 0   -- ⚠️ ต้องรีเซ็ตด้�
 --    = ดาบไม่เคยถูกอัพเลยตั้งแต่รอบที่ 2 เป็นต้นไป (ฟาร์มช้าเพราะดาบพังบ่อย)
 getgenv()._VZChoreWait     = 0
 getgenv()._VZLastUpgradeT  = nil   -- คูลดาวน์อัพดาบ ก็ต้องรีเซ็ตเหมือนกัน
+getgenv()._VZTSWhy         = nil   -- เหตุผลที่ยังไม่ทำหอก (ไว้กัน log ซ้ำ)
 getgenv()._VZUpgFailGold   = nil
 getgenv()._VZUpgSet        = nil
 
@@ -6002,8 +6003,43 @@ task.spawn(function()
     -- คืน true = สร้างด่าน TS แล้ว → ให้ brain ข้ามการสร้าง Chapel รอบนี้
     local function tryThunderSpear(pr, tan)
         if VZ.AutoThunderSpearQuest ~= true then return false end
-        if (tonumber(pr) or 0) < (tonumber(VZ.ThunderSpearAtPrestige) or 2) then return false end
-        if not tan then return false end
+
+        local prN   = tonumber(pr) or 0
+        local minP  = tonumber(VZ.ThunderSpearAtPrestige) or 2
+        local target = tonumber(VZ.PrestigeTarget) or 5
+
+        if prN < minP then
+            if getgenv()._VZTSWhy ~= "prestige" then
+                getgenv()._VZTSWhy = "prestige"
+                print(string.format("[TS] ⏸️ ยังไม่ทำหอก — จุติ P.%d ยังไม่ถึง P.%d ที่ตั้งไว้", prN, minP))
+            end
+            return false
+        end
+
+        -- ⭐ กติกา "ต้องรอเลเวลตันไหม" — อิงว่าจุติตอนนี้ "เท่ากับ" หรือ "เกิน" ค่าที่ตั้งไว้
+        --    • จุติ == ที่ตั้งไว้  → รอตันก่อน  (เพิ่งมาถึงจุดนั้น ยังเก็บ XP ต่อได้)
+        --    • จุติ >  ที่ตั้งไว้  → ลุยเลย     (เลยจุดที่สั่งไว้แล้ว ไม่ต้องรออะไรอีก)
+        --    ตัวอย่าง:
+        --      ตั้ง 5 + ตอนนี้ P.5  → รอตัน 225 ก่อน
+        --      ตั้ง 4 + ตอนนี้ P.5  → ทำหอกทันที ไม่สนเลเวล
+        --      ตั้ง 4 + ตอนนี้ P.4  → รอตันก่อน
+        local needCap = (prN <= minP)
+        if VZ.ThunderSpearNeedCap ~= nil then needCap = (VZ.ThunderSpearNeedCap == true) end
+
+        if needCap and not tan then
+            if getgenv()._VZTSWhy ~= "cap" then
+                getgenv()._VZTSWhy = "cap"
+                print(string.format("[TS] ⏸️ ยังไม่ทำหอก — จุติ P.%d เท่ากับที่ตั้งไว้พอดี → รอเลเวลตันก่อน"
+                    .. " (ถ้าอยากให้ทำเลย ตั้ง ThunderSpearAtPrestige ต่ำกว่านี้)", prN))
+            end
+            return false
+        end
+
+        if getgenv()._VZTSWhy ~= "go" then
+            getgenv()._VZTSWhy = "go"
+            print(string.format("[TS] ▶️ เงื่อนไขครบ → เริ่มหาชิ้นส่วนหอก (จุติ P.%d | ตั้งไว้ P.%d | ตัน=%s | ต้องรอตัน=%s)",
+                prN, minP, tostring(tan), tostring(needCap)))
+        end
 
         tsClaimAll()
         task.wait(0.3)
