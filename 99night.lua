@@ -18,20 +18,21 @@
 --  ถ้าไม่เห็น 4 บรรทัดนี้ใน F9 = ยังรันโค้ดตัวเก่าอยู่ ให้ paste ไฟล์ใหม่ทับ
 -- ═══════════════════════════════════════════════════════════════
 print("═══════════════════════════════════════════════")
-print("🛡️ VENOZ NO-SB — BUILD v6.9")
+print("🛡️ VENOZ NO-SB — BUILD v7.0")
 print("   🔁 RETRY กดครั้งเดียว (รอนิ่ง 3 วิก่อนกด)")
 print("   ⚡ เข้าด่าน = ฟาร์มทันที ไม่รอโหลดอะไรทั้งนั้น")
 print("   ⬛ จอว่างทุกที่ (Main Menu + Lobby + ในด่าน) + ปิดแชทถาวร")
 print("   ⏳ แก้ค้างจอ LOADING ตอนกดออกจากด่าน")
 print("   🐛 TS: แก้ objective ด่าน — Forest=Guard, Utgard=Defend (เดิม Skirmish = ไม่มีกล่อง)")
-print("   ✅ TS: Skirmish ล้วนทุกแมพ (Forest → Utgard)")
+print("   🐛 TS: Forest ต้องตีถึง req-5 ก่อน กล่องถึงจะ spawn (ยกลำดับบอทเก่ามา)")
+print("   🐛 TS: สมองบอทไม่เคยรู้จักธง TS → จบด่านแล้วกด RETRY ซ้ำ (แก้แล้ว)")
 print("   🚪 TS: แมพ TS เล่นรอบเดียวแล้วออกเสมอ ไม่ RETRY ซ้ำ")
 print("   🔍 เช็คให้เลยว่าคอนฟิกส่งถึงสคริปจริงไหม (ดูบรรทัด [CONFIG])")
 print("   🛡️ ใช้ remote ทั้งหมดเหมือนเดิม แต่ทุกจุดมีด่านเช็คก่อนยิง")
 print("   🔇 ปิดเคลมเควส/achievement/สกิล เป็นค่าเริ่มต้น (ตัดไป 281 call)")
 print("   🗑️ ตัดโค้ดไม่ใช้ทิ้ง 2,749 บรรทัด")
 print("═══════════════════════════════════════════════")
-getgenv().VenozBuild = "v6.9-nosb"
+getgenv().VenozBuild = "v7.0-nosb"
 
 -- ระบบเช็คสถานะ GUI และ Auto Teleport เมื่อผิดปกติ
 task.spawn(function()
@@ -6460,7 +6461,13 @@ task.spawn(function()
                     local sellable = perkInfo()
                     local tan, pr = isTan()
                     local pT = perkTarget()
-                    local wantLeave = (sellable >= pT) or (tan and pr < VZ.PrestigeTarget)
+                    -- 🐛 [FIX] เดิมไม่เคยเช็คธงของระบบ TS เลย
+                    --    → จบด่าน TS ปุ๊บ สมองบอทตัดสินจาก perk/จุติ แล้วสั่ง RETRY
+                    --      = วนเล่นแมพ TS ซ้ำไม่จบ ทั้งที่งานเสร็จแล้ว
+                    local tsLeave = (getgenv().VenozTSWantLeave == true)
+                    local wantLeave = tsLeave
+                        or (sellable >= pT) or (tan and pr < VZ.PrestigeTarget)
+                    if tsLeave then setStatus("🚪 ออกจากแมพ TS (งานเสร็จแล้ว)") end
                     if wantLeave then
                         getgenv().StartRejoin = false
                         local b = rewards:FindFirstChild("Main")
@@ -9599,10 +9606,8 @@ task.spawn(function()
         end)
         getgenv()._VZTSQHit = hit
         if hit and not getgenv().VenozTSWantLeave then
-            print("═══════════════════════════════════════════")
-            print(string.format("[TS] ✅ เควส \"%s\" ทำครบแล้ว → ไม่ต้องฟาร์มต่อ", tostring(ready)))
-            print("🚪 ออกจากด่านไปกดรับของเลย")
-            print("═══════════════════════════════════════════")
+            print(string.format("[TS] ✅ เควส \"%s\" ทำครบแล้ว → จบด่านแล้วจะ LEAVE (ไม่ RETRY)",
+                tostring(ready)))
         end
         return hit
     end
@@ -9702,10 +9707,27 @@ task.spawn(function()
                 local req = (slayO and slayO:GetAttribute("Requirement")) or 40
                 local defending = objGet("Defend_Supplies") ~= nil
 
+                -- 🐛 [FIX] ผมเคยกลับลำดับเป็น "เก็บกล่องก่อน แล้วค่อยฟาร์ม"
+                --    → ผลคือค้างที่ "📦 รอกล่องโหลด..." ตลอด เพราะ
+                --      **กล่องยังไม่ spawn ตอนเพิ่งเข้าด่าน**
+                --    ✅ บอทเก่าทำถูกแล้ว: ฆ่าให้ถึง (req - 5) ก่อน กล่องถึงจะโผล่
+                --       KILL_TO_MARGIN → COLLECT → KILL_ALL
                 if state == "INIT" then
-                    state = "COLLECT"
-                    holdFarmOff()
-                    print("[TS] 📦 Forest → หยุดฟาร์ม เก็บกล่องก่อนเป็นอย่างแรก")
+                    state = "KILL_TO_MARGIN"
+                    setFarm(true)          -- ต้องฟาร์มก่อน ไม่ใช่ปิด
+                    print(string.format("[TS] ⚔️ Forest → ตีให้ถึง %d/%d ก่อน กล่องถึงจะโผล่",
+                        math.max(0, req - 5), req))
+                end
+
+                if state == "KILL_TO_MARGIN" then
+                    local safeMax = req - 5
+                    getgenv().VenozAction = string.format("⚡ ตีให้ถึง %d/%d", slay, safeMax)
+                    if slay >= safeMax then
+                        state = "COLLECT"
+                        holdFarmOff()
+                        print("[TS] ✅ ถึงเป้าแล้ว → หยุดตี ไปเก็บกล่อง")
+                    end
+                    return                 -- ยังไม่ถึง → ตีต่อ ไม่ต้องทำอย่างอื่น
                 end
 
                 if defending and state ~= "KILL_ALL" then
@@ -9739,16 +9761,15 @@ task.spawn(function()
                                     if objGet("Defend_Supplies") then sawDefend = true break end
                                     task.wait(0.5)
                                 end
+                                -- ⚠️ บอทเก่าเตือนไว้: "ห้ามกด LEAVE กลางด่าน"
+                                --    เกมจะนับเป็น abandon → เควส Spears ไม่ credit
+                                --    → แค่ตั้งธงไว้ พอ Rewards โผล่ค่อยกด LEAVE
                                 if sawDefend then
                                     print("[TS] 🛡️ มีเฟสป้องกันต่อ → อยู่ตีจนจบด่าน")
                                 else
-                                    print("═══════════════════════════════════════════")
-                                    print("[TS] ✅ ไม่มีป้าย Defend = เควส Forest สำเร็จแล้ว")
-                                    print("🚪 ออกไปกดรับที่ lobby เลย ไม่ต้องตีต่อ")
-                                    print("═══════════════════════════════════════════")
-                                    getgenv().VenozTSWantLeave = true
-                                    getgenv().StartRejoin = false
+                                    print("[TS] ✅ ไม่มีเฟสป้องกัน → ตีจนด่านจบแล้วค่อยออก")
                                 end
+                                getgenv().VenozTSWantLeave = true   -- จบด่านแล้ว LEAVE (ไม่ RETRY)
                                 checkDoneAndFlag()
                             end)
                         elseif waitCrate > 30 then
@@ -9791,13 +9812,13 @@ task.spawn(function()
                 local need = tonumber(ib and ib:GetAttribute("Requirement")) or 3
                 getgenv().VenozAction = string.format("❄️ Utgard — Ice Burst %d/%d", cur, need)
 
+                -- ⚠️ ครบแล้วก็ "ห้ามกด LEAVE กลางด่าน" (บอทเก่าเตือนไว้ชัด)
+                --    เกมนับเป็น abandon → เควส Ice Burst ไม่ credit
+                --    แค่ตั้งธงไว้ พอด่านจบ Rewards โผล่ ค่อยกด LEAVE แทน RETRY
                 if cur >= need and not getgenv().VenozTSWantLeave then
-                    print("═══════════════════════════════════════════")
-                    print(string.format("[TS] ❄️ Ice Burst ครบ %d/%d → เควสสำเร็จแล้ว", cur, need))
-                    print("🚪 ไม่ต้องเล่นต่อ → ออกไปกดรับที่ lobby เลย")
-                    print("═══════════════════════════════════════════")
+                    print(string.format("[TS] ❄️ Ice Burst ครบ %d/%d → ตีต่อจนด่านจบ แล้วค่อยออก",
+                        cur, need))
                     getgenv().VenozTSWantLeave = true
-                    getgenv().StartRejoin = false
                 end
 
             -- ══ Outskirts → Handle : ฆ่าเหลือ 5 → สร้างหอ 3 หลัง ══
