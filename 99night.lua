@@ -18,19 +18,19 @@
 --  ถ้าไม่เห็น 4 บรรทัดนี้ใน F9 = ยังรันโค้ดตัวเก่าอยู่ ให้ paste ไฟล์ใหม่ทับ
 -- ═══════════════════════════════════════════════════════════════
 print("═══════════════════════════════════════════════")
-print("🛡️ VENOZ NO-SB — BUILD v6.4")
+print("🛡️ VENOZ NO-SB — BUILD v6.6")
 print("   🔁 RETRY กดครั้งเดียว (รอนิ่ง 3 วิก่อนกด)")
 print("   ⚡ เข้าด่าน = ฟาร์มทันที ไม่รอโหลดอะไรทั้งนั้น")
 print("   ⬛ จอว่างทุกที่ (Main Menu + Lobby + ในด่าน) + ปิดแชทถาวร")
 print("   ⏳ แก้ค้างจอ LOADING ตอนกดออกจากด่าน")
 print("   🐛 TS: แก้ objective ด่าน — Forest=Guard, Utgard=Defend (เดิม Skirmish = ไม่มีกล่อง)")
-print("   ✅ TS: เควสครบเมื่อไหร่ ออกจากด่านไปกดรับของทันที ไม่ฟาร์มต่อ")
+print("   ✅ TS: Utgard ครบ 3/3 ออกทันที | Forest ส่งกล่องครบ+ไม่มี Defend = ออกเลย")
 print("   🔍 เช็คให้เลยว่าคอนฟิกส่งถึงสคริปจริงไหม (ดูบรรทัด [CONFIG])")
 print("   🛡️ ใช้ remote ทั้งหมดเหมือนเดิม แต่ทุกจุดมีด่านเช็คก่อนยิง")
 print("   🔇 ปิดเคลมเควส/achievement/สกิล เป็นค่าเริ่มต้น (ตัดไป 281 call)")
 print("   🗑️ ตัดโค้ดไม่ใช้ทิ้ง 2,749 บรรทัด")
 print("═══════════════════════════════════════════════")
-getgenv().VenozBuild = "v6.4-nosb"
+getgenv().VenozBuild = "v6.6-nosb"
 
 -- ระบบเช็คสถานะ GUI และ Auto Teleport เมื่อผิดปกติ
 task.spawn(function()
@@ -9228,6 +9228,19 @@ task.spawn(function()
         end
         pr, lv = pr or 0, lv or 0
         if pr < minP then return false, pr, lv end
+
+        -- 🐛 [FIX] เดิมบังคับ "ตัน + XP เต็ม" ถึงจะยอมเคลม
+        --    → จอ P.5 Lv.137/225 ทำเควสเสร็จ ออกจากด่านมาแล้ว แต่ไม่มีใครกดรับให้
+        --      เพราะด่านนี้ยังไม่ตัน = เควสค้างเป็น "ทำครบแต่ไม่ได้ของ" ตลอดกาล
+        --    ✅ ใช้กติกาเดียวกับตอนตัดสินใจไปทำหอก:
+        --         จุติ == ที่ตั้งไว้ → ต้องตันก่อน
+        --         จุติ >  ที่ตั้งไว้ → เคลมได้เลย
+        --    เหตุผล: ถ้าเควสทำครบแล้ว การไม่กดรับไม่ได้ช่วยอะไรเลย มีแต่เสียของ
+        local needCap = (pr <= minP)
+        local VZg = getgenv().VenozChicken or {}
+        if VZg.ThunderSpearNeedCap ~= nil then needCap = (VZg.ThunderSpearNeedCap == true) end
+        if not needCap then return true, pr, lv end
+
         local capped = lv >= (100 + pr * 25)
         local full = (mx and mx > 0 and xp and xp >= mx) or false
         return (capped and full), pr, lv
@@ -9602,6 +9615,10 @@ task.spawn(function()
             return true
         end
         -- ② ของเข้ากระเป๋าแล้วจริงๆ
+        --    ⚠️ ระหว่างอยู่ในด่าน "กดรับเควสไม่ได้" (ร้านเควสเปิดได้แค่ที่ lobby)
+        --       → ปกติเงื่อนไขนี้จะไม่ติดกลางด่านหรอก มันมีไว้ดักกรณีเดียวคือ
+        --         "เข้ามาผิดแมพ ทั้งที่มีชิ้นส่วนนี้อยู่แล้ว" → จะได้ออกไว ไม่เสียเวลา
+        --       ตัวที่ใช้ตัดสินใจจริงกลางด่านคือ ① tsQuestDone() ข้างบน
         local o = ownedParts()
         if o[part] then
             if not getgenv().VenozTSWantLeave then
@@ -9680,10 +9697,30 @@ task.spawn(function()
                         -- แมพอาจยังโหลดไม่เสร็จ → รอถึง 30 วิ ค่อยยอมแพ้
                         waitCrate = waitCrate + 1
                         if delivered > 0 then
-                            print(string.format("[TS] ✅ ส่งกล่องครบ %d ใบ → เปิดฟาร์มตีต่อจนจบด่าน", delivered))
+                            -- 💡 เจ้าของบอทยืนยันกติกา Forest:
+                            --    ส่งกล่องครบแล้ว → ถ้า "ป้าย Defend ไม่โผล่" = จบงานแล้ว ออกได้เลย
+                            --    ถ้าโผล่ = ยังมีเฟส 2 ให้ป้องกัน ต้องอยู่ตีต่อ
+                            print(string.format("[TS] ✅ ส่งกล่องครบ %d ใบ → รอดูว่ามีเฟสป้องกันต่อไหม", delivered))
                             state = "KILL_ALL"; setFarm(true)
-                            task.spawn(function()      -- เช็คว่าได้ของรึยังหลังส่งครบ
-                                task.wait(4); checkDoneAndFlag()
+                            task.spawn(function()
+                                -- รอ 8 วิให้เกมตัดสินใจว่าจะขึ้นเฟส Defend หรือไม่
+                                local t0 = tick()
+                                local sawDefend = false
+                                while tick() - t0 < 8 do
+                                    if objGet("Defend_Supplies") then sawDefend = true break end
+                                    task.wait(0.5)
+                                end
+                                if sawDefend then
+                                    print("[TS] 🛡️ มีเฟสป้องกันต่อ → อยู่ตีจนจบด่าน")
+                                else
+                                    print("═══════════════════════════════════════════")
+                                    print("[TS] ✅ ไม่มีป้าย Defend = เควส Forest สำเร็จแล้ว")
+                                    print("🚪 ออกไปกดรับที่ lobby เลย ไม่ต้องตีต่อ")
+                                    print("═══════════════════════════════════════════")
+                                    getgenv().VenozTSWantLeave = true
+                                    getgenv().StartRejoin = false
+                                end
+                                checkDoneAndFlag()
                             end)
                         elseif waitCrate > 30 then
                             print("[TS] ⚠️ หากล่อง/วงเหลืองไม่เจอใน 30 วิ → ฟาร์มปกติแทน")
@@ -9716,11 +9753,23 @@ task.spawn(function()
                     getgenv().VenozAction = string.format("⚡ Forest — ตี titan (%d/%d)", slay, req)
                 end
 
-            -- ══ Utgard → Thruster : ฆ่า Ice Burst (ตีทุกตัวเพื่อ progress) ══
+            -- ══ Utgard → Thruster : ฆ่า Ice Burst 3 ลูก ══
+            --   💡 เจ้าของบอทยืนยัน: ครบ 3/3 เมื่อไหร่ = เควสสำเร็จทันที
+            --      เล่นรอบเดียวพอ ไม่ต้องอยู่ต่อจนด่านจบ → กดออกไปกดรับได้เลย
             elseif myMap == "Utgard" then
                 local ib = objGet("Ice_Burst") or objGet("Ice Burst Stones")
-                local cur = (ib and ib.Value) or iceSeen
-                getgenv().VenozAction = string.format("❄️ Utgard — Ice Burst %s/3", tostring(cur))
+                local cur = tonumber((ib and ib.Value)) or tonumber(iceSeen) or 0
+                local need = tonumber(ib and ib:GetAttribute("Requirement")) or 3
+                getgenv().VenozAction = string.format("❄️ Utgard — Ice Burst %d/%d", cur, need)
+
+                if cur >= need and not getgenv().VenozTSWantLeave then
+                    print("═══════════════════════════════════════════")
+                    print(string.format("[TS] ❄️ Ice Burst ครบ %d/%d → เควสสำเร็จแล้ว", cur, need))
+                    print("🚪 ไม่ต้องเล่นต่อ → ออกไปกดรับที่ lobby เลย")
+                    print("═══════════════════════════════════════════")
+                    getgenv().VenozTSWantLeave = true
+                    getgenv().StartRejoin = false
+                end
 
             -- ══ Outskirts → Handle : ฆ่าเหลือ 5 → สร้างหอ 3 หลัง ══
             elseif myMap == "Outskirts" then
