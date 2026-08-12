@@ -18,18 +18,19 @@
 --  ถ้าไม่เห็น 4 บรรทัดนี้ใน F9 = ยังรันโค้ดตัวเก่าอยู่ ให้ paste ไฟล์ใหม่ทับ
 -- ═══════════════════════════════════════════════════════════════
 print("═══════════════════════════════════════════════")
-print("🛡️ VENOZ NO-SB — BUILD v6.2")
+print("🛡️ VENOZ NO-SB — BUILD v6.4")
 print("   🔁 RETRY กดครั้งเดียว (รอนิ่ง 3 วิก่อนกด)")
 print("   ⚡ เข้าด่าน = ฟาร์มทันที ไม่รอโหลดอะไรทั้งนั้น")
 print("   ⬛ จอว่างทุกที่ (Main Menu + Lobby + ในด่าน) + ปิดแชทถาวร")
 print("   ⏳ แก้ค้างจอ LOADING ตอนกดออกจากด่าน")
-print("   ⚡ TS: จุติเท่าที่ตั้ง=รอตัน | จุติเกินที่ตั้ง=ทำหอกทันที")
+print("   🐛 TS: แก้ objective ด่าน — Forest=Guard, Utgard=Defend (เดิม Skirmish = ไม่มีกล่อง)")
+print("   ✅ TS: เควสครบเมื่อไหร่ ออกจากด่านไปกดรับของทันที ไม่ฟาร์มต่อ")
 print("   🔍 เช็คให้เลยว่าคอนฟิกส่งถึงสคริปจริงไหม (ดูบรรทัด [CONFIG])")
 print("   🛡️ ใช้ remote ทั้งหมดเหมือนเดิม แต่ทุกจุดมีด่านเช็คก่อนยิง")
 print("   🔇 ปิดเคลมเควส/achievement/สกิล เป็นค่าเริ่มต้น (ตัดไป 281 call)")
 print("   🗑️ ตัดโค้ดไม่ใช้ทิ้ง 2,749 บรรทัด")
 print("═══════════════════════════════════════════════")
-getgenv().VenozBuild = "v6.2-nosb"
+getgenv().VenozBuild = "v6.4-nosb"
 
 -- ระบบเช็คสถานะ GUI และ Auto Teleport เมื่อผิดปกติ
 task.spawn(function()
@@ -6065,9 +6066,18 @@ task.spawn(function()
         local attempts = getgenv()._VZTSTry[part]
 
         -- Outskirts: ถ้า Towers เคลมไปแล้ว = ไม่ต้องสร้างหอ → ใช้ Escort ตรงๆ
-        local obj = "Skirmish"
-        if nextMap == "Outskirts" and (tsClaimed("Towers") or attempts >= 2) then
-            obj = "Escort"
+        -- 🐛 [FIX] เดิมสร้างด่านเป็น "Skirmish" ทุกแมพ → ไม่มีกล่องเสบียง spawn เลย
+        --    (log ฟ้องตรงๆ: "หากล่อง/วงเหลืองไม่เจอใน 30 วิ → ฟาร์มปกติแทน"
+        --     และ OBJECTIVES ในเกมขึ้น Slay Titans/Execute Skills = ด่านธรรมดา)
+        --    ✅ objective ที่มีกล่องจริง ดูจากตาราง MissionObjectives ของเกม:
+        --         Outskirts = {Skirmish, Escort, Random}
+        --         Utgard    = {Skirmish, Defend, Random}   ← Thruster ต้องใช้ Defend
+        --         Forest    = {Skirmish, Guard,  Random}   ← Base     ต้องใช้ Guard
+        local TS_MAP_TO_OBJ = { Outskirts = "Escort", Utgard = "Defend", Forest = "Guard" }
+        local obj = TS_MAP_TO_OBJ[nextMap] or "Skirmish"
+        -- Outskirts: ถ้ายังไม่เคลม Towers ต้องไปสร้างหอก่อน (Skirmish) ค่อยไป Escort
+        if nextMap == "Outskirts" and not (tsClaimed("Towers") or attempts >= 2) then
+            obj = "Skirmish"
         end
 
         print(string.format("[TS] ⚡ ตันแล้ว (P%d) → ไปเก็บ %s ที่ %s (%s, ครั้งที่ %d)",
@@ -9364,6 +9374,8 @@ task.spawn(function()
     -- ⚠️ ต้องรีเซ็ตทุกครั้งที่เข้าแมพใหม่ (getgenv ค้างข้ามการ teleport)
     --    ไม่งั้นธง "อยากออก" จากแมพ TS จะติดค้างไปถึง Chapel = ออกทุกด่าน
     getgenv().VenozTSWantLeave = false
+    getgenv()._VZTSQChk = nil       -- cache เช็คเควส ต้องเริ่มใหม่ทุกแมพ
+    getgenv()._VZTSQHit = nil
 
     local VZt = getgenv().VenozChicken or {}
     if VZt.AutoThunderSpearQuest ~= true then return end
@@ -9382,6 +9394,8 @@ task.spawn(function()
     if not myMap then return end   -- ไม่ใช่แมพ TS → เงียบไป
 
     local part = TS_PART_OF[myMap]
+    local GETs = game:GetService("ReplicatedStorage"):WaitForChild("Assets")
+        :WaitForChild("Remotes"):WaitForChild("GET")
     getgenv().VenozTSMap = myMap
     print(string.format("[TS] ⚡ อยู่ในแมพ %s → ภารกิจเก็บชิ้นส่วน %s", myMap, part))
 
@@ -9531,7 +9545,63 @@ task.spawn(function()
     end
 
     -- 🚪 ถ้าชิ้นส่วนของแมพนี้ "ได้มาแล้ว" → ไม่ต้องเล่นซ้ำ ออกไปทำแมพต่อไป
+    -- ═══════════════════════════════════════════════════════════
+    -- ✅ เช็ค "เควสสำเร็จแล้วหรือยัง" — สำเร็จปุ๊บออกไปรับของเลย
+    -- ═══════════════════════════════════════════════════════════
+    --   ต่างจาก ownedParts() ตรงที่:
+    --     ownedParts  = "ของอยู่ในกระเป๋าแล้ว"  (ต้องเคลมก่อนถึงจะมี)
+    --     questDone   = "ทำครบแล้ว รอกดรับ"     ← อันนี้แหละที่ควรใช้ตัดสินใจออก
+    --   ไม่งั้นบอทจะยืนฟาร์มต่อจนด่านจบทั้งที่งานเสร็จไปแล้ว เสียเวลาเปล่า
+    --   💤 อ่านทุก 30 วิเท่านั้น (1 call) — ไม่ยิงถี่
+    local function tsQuestDone()
+        local now = os.clock()
+        local last = tonumber(getgenv()._VZTSQChk) or -999
+        if (now - last) < 30 then return getgenv()._VZTSQHit == true end
+        getgenv()._VZTSQChk = now
+
+        local hit, ready = false, nil
+        pcall(function()
+            local d
+            local ok, r = pcall(function() return GETs:InvokeServer("Data", "Copy") end)
+            if ok and type(r) == "table" and r.Slots then d = r end
+            if not d then
+                ok, r = pcall(function()
+                    return GETs:InvokeServer("Functions", "Settings", "Blur", "Off")
+                end)
+                if ok and type(r) == "table" and r.Slots then d = r end
+            end
+            local sd = d and d.Slots[d.Current_Slot]
+            local q  = sd and sd.Quests and sd.Quests.Spears
+            if type(q) ~= "table" then return end
+            for _, v in pairs(q) do
+                if type(v) == "table" and v.Tag and v.Rewarded ~= true then
+                    local cur = tonumber(v.Current) or 0
+                    local req = tonumber(v.Requirement) or tonumber(v.Required) or 0
+                    if req > 0 and cur >= req then
+                        hit, ready = true, tostring(v.Tag)
+                        return
+                    end
+                end
+            end
+        end)
+        getgenv()._VZTSQHit = hit
+        if hit and not getgenv().VenozTSWantLeave then
+            print("═══════════════════════════════════════════")
+            print(string.format("[TS] ✅ เควส \"%s\" ทำครบแล้ว → ไม่ต้องฟาร์มต่อ", tostring(ready)))
+            print("🚪 ออกจากด่านไปกดรับของเลย")
+            print("═══════════════════════════════════════════")
+        end
+        return hit
+    end
+
     local function checkDoneAndFlag()
+        -- ① เควสครบแล้ว รอกดรับ → ออกเลย (ไม่ต้องรอให้ของเข้ากระเป๋า)
+        if tsQuestDone() then
+            getgenv().VenozTSWantLeave = true
+            getgenv().StartRejoin = false
+            return true
+        end
+        -- ② ของเข้ากระเป๋าแล้วจริงๆ
         local o = ownedParts()
         if o[part] then
             if not getgenv().VenozTSWantLeave then
@@ -9564,9 +9634,10 @@ task.spawn(function()
             print("[TS] ⏭️ แมพนี้ได้ของแล้วตั้งแต่แรก → ข้ามไปเลย")
             setFarm(true)                     -- ฟาร์มไปพลางจนด่านจบ แล้วค่อย LEAVE
         end
-        -- หลังจากนั้นเช็คทุก 20 วิ เผื่อได้ของกลางด่าน
+        -- หลังจากนั้นเช็คทุก 15 วิ — ทั้ง "ของเข้ากระเป๋า" และ "เควสครบรอกดรับ"
+        --   (ตัวเช็คเควสมี cache 30 วิในตัวเอง → ยิงจริงแค่ทุก 30 วิ ไม่ถี่)
         while not getgenv().VenozTSWantLeave do
-            task.wait(20)
+            task.wait(15)
             checkDoneAndFlag()
         end
     end)
