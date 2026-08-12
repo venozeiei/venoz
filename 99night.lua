@@ -18,19 +18,20 @@
 --  ถ้าไม่เห็น 4 บรรทัดนี้ใน F9 = ยังรันโค้ดตัวเก่าอยู่ ให้ paste ไฟล์ใหม่ทับ
 -- ═══════════════════════════════════════════════════════════════
 print("═══════════════════════════════════════════════")
-print("🛡️ VENOZ NO-SB — BUILD v6.6")
+print("🛡️ VENOZ NO-SB — BUILD v6.9")
 print("   🔁 RETRY กดครั้งเดียว (รอนิ่ง 3 วิก่อนกด)")
 print("   ⚡ เข้าด่าน = ฟาร์มทันที ไม่รอโหลดอะไรทั้งนั้น")
 print("   ⬛ จอว่างทุกที่ (Main Menu + Lobby + ในด่าน) + ปิดแชทถาวร")
 print("   ⏳ แก้ค้างจอ LOADING ตอนกดออกจากด่าน")
 print("   🐛 TS: แก้ objective ด่าน — Forest=Guard, Utgard=Defend (เดิม Skirmish = ไม่มีกล่อง)")
-print("   ✅ TS: Utgard ครบ 3/3 ออกทันที | Forest ส่งกล่องครบ+ไม่มี Defend = ออกเลย")
+print("   ✅ TS: Skirmish ล้วนทุกแมพ (Forest → Utgard)")
+print("   🚪 TS: แมพ TS เล่นรอบเดียวแล้วออกเสมอ ไม่ RETRY ซ้ำ")
 print("   🔍 เช็คให้เลยว่าคอนฟิกส่งถึงสคริปจริงไหม (ดูบรรทัด [CONFIG])")
 print("   🛡️ ใช้ remote ทั้งหมดเหมือนเดิม แต่ทุกจุดมีด่านเช็คก่อนยิง")
 print("   🔇 ปิดเคลมเควส/achievement/สกิล เป็นค่าเริ่มต้น (ตัดไป 281 call)")
 print("   🗑️ ตัดโค้ดไม่ใช้ทิ้ง 2,749 บรรทัด")
 print("═══════════════════════════════════════════════")
-getgenv().VenozBuild = "v6.6-nosb"
+getgenv().VenozBuild = "v6.9-nosb"
 
 -- ระบบเช็คสถานะ GUI และ Auto Teleport เมื่อผิดปกติ
 task.spawn(function()
@@ -6066,19 +6067,18 @@ task.spawn(function()
         local attempts = getgenv()._VZTSTry[part]
 
         -- Outskirts: ถ้า Towers เคลมไปแล้ว = ไม่ต้องสร้างหอ → ใช้ Escort ตรงๆ
-        -- 🐛 [FIX] เดิมสร้างด่านเป็น "Skirmish" ทุกแมพ → ไม่มีกล่องเสบียง spawn เลย
-        --    (log ฟ้องตรงๆ: "หากล่อง/วงเหลืองไม่เจอใน 30 วิ → ฟาร์มปกติแทน"
-        --     และ OBJECTIVES ในเกมขึ้น Slay Titans/Execute Skills = ด่านธรรมดา)
-        --    ✅ objective ที่มีกล่องจริง ดูจากตาราง MissionObjectives ของเกม:
-        --         Outskirts = {Skirmish, Escort, Random}
-        --         Utgard    = {Skirmish, Defend, Random}   ← Thruster ต้องใช้ Defend
-        --         Forest    = {Skirmish, Guard,  Random}   ← Base     ต้องใช้ Guard
-        local TS_MAP_TO_OBJ = { Outskirts = "Escort", Utgard = "Defend", Forest = "Guard" }
-        local obj = TS_MAP_TO_OBJ[nextMap] or "Skirmish"
-        -- Outskirts: ถ้ายังไม่เคลม Towers ต้องไปสร้างหอก่อน (Skirmish) ค่อยไป Escort
-        if nextMap == "Outskirts" and not (tsClaimed("Towers") or attempts >= 2) then
-            obj = "Skirmish"
-        end
+        -- ⚠️ [กลับของเดิม] ผมเคยเดาว่าต้องใช้ objective เฉพาะของแต่ละแมพ
+        --    (Forest = "Guard", Utgard = "Defend") — ทดสอบแล้ว **ผิด**
+        --    "Guard" ของ Forest คือภารกิจ "Guard Annie [0/5]" คนละเรื่องกับกล่องเสบียง
+        --    ✅ ของจริงคือ Skirmish — ยืนยันจากหน้าเควสของเจ้าของบอทเอง:
+        --       RETRIEVE MISSING SUPPLIES ขึ้น CLAIMED 3/3 และ ICE BURST STONES 3/3
+        --       = สองเควสนี้ทำสำเร็จมาแล้วด้วย Skirmish
+        --    กล่องเสบียง/Ice Burst เป็น "เหตุการณ์ที่โผล่ระหว่างด่าน" ไม่ใช่ objective หลัก
+        --    → เจอก็เก็บ ไม่เจอก็ปล่อยด่านจบไป แล้วเข้าใหม่รอบหน้า
+        -- ✅ Skirmish ล้วน — ยืนยันโดยเจ้าของบอท
+        --    (ถอดสาขา Escort ทิ้งด้วย: tsNextMap คืนแค่ Forest/Utgard เท่านั้น
+        --     Outskirts ถูกข้ามถาวรอยู่แล้ว → โค้ดนั้นไม่มีวันทำงาน)
+        local obj = "Skirmish"
 
         print(string.format("[TS] ⚡ ตันแล้ว (P%d) → ไปเก็บ %s ที่ %s (%s, ครั้งที่ %d)",
             pr, tostring(part), nextMap, obj, attempts))
@@ -9643,6 +9643,35 @@ task.spawn(function()
 
     -- 🔒 เข้าแมพ TS = ไม่ใช่ด่านฟาร์มปกติ → ปิดฟาร์มทันที ทำ objective ก่อน
     if myMap == "Forest" then setFarm(false) end
+
+    -- ═══════════════════════════════════════════════════════════
+    -- 🚪 กติกาเหล็ก: อยู่แมพ TS = "เล่นรอบเดียวแล้วออก" เสมอ
+    -- ═══════════════════════════════════════════════════════════
+    --   💡 เจ้าของบอทชี้จุดสำคัญ: เราตีไททันตายหมดเร็วมาก
+    --      ด่านจบก่อนที่ตัวเช็ค objective จะทันเห็น 3/3 ด้วยซ้ำ
+    --      → จะไปพึ่งการ "จับจังหวะนับให้ทัน" ไม่ได้
+    --   ✅ เลยเปลี่ยนเป็นกฎตายตัว: พอหน้าจบด่านโผล่ในแมพ TS = ออกเสมอ
+    --      ไม่ RETRY ซ้ำแมพเดิมเด็ดขาด (เควสได้ credit ตั้งแต่ด่านจบแล้ว)
+    --      ถ้ายังไม่ครบจริง สมองบอทที่ lobby จะส่งกลับมาเองรอบหน้า
+    task.spawn(function()
+        while not getgenv().VenozTSWantLeave do
+            task.wait(1)
+            local up = false
+            pcall(function()
+                local rw = plrT.PlayerGui.Interface:FindFirstChild("Rewards")
+                up = (rw and rw.Visible) or false
+            end)
+            if up then
+                print("═══════════════════════════════════════════")
+                print("[TS] 🏁 ด่าน TS จบแล้ว → ออกทันที (แมพ TS เล่นรอบเดียวพอ)")
+                print("🚪 ไม่ RETRY ซ้ำ — ไปกดรับที่ lobby เลย")
+                print("═══════════════════════════════════════════")
+                getgenv().VenozTSWantLeave = true
+                getgenv().StartRejoin = false
+                break
+            end
+        end
+    end)
 
     -- เช็คตั้งแต่เข้ามา: ถ้ามีของอยู่แล้ว = เข้าผิดแมพ → ออกเลย ไม่ต้องเสียเวลา
     task.spawn(function()
